@@ -101,12 +101,38 @@
         .data-table tr.zone-ammonia { background: #eaf5ec; }
         
         .table-wrapper { max-height: 400px; overflow-y: auto; }
-        
+
         .export-buttons { display: flex; gap: 10px; margin-top: 10px; }
         .export-buttons .btn { font-size: 12px; padding: 8px 15px; }
-        
+
         @media (max-width: 1200px) {
             .main-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .container { padding: 0 6px; }
+            .header { flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 14px; }
+            .header h1 { font-size: 22px; }
+            .lang-btn { font-size: 12px; padding: 5px 10px; }
+            .main-grid { grid-template-columns: 1fr; gap: 14px; }
+            .panel-body { padding: 16px; }
+            .form-row { grid-template-columns: 1fr; }
+            .chart-container { height: 280px; }
+            .export-buttons { flex-direction: column; align-items: stretch; }
+            .export-buttons .btn { width: 100%; }
+        }
+
+        @media (max-width: 480px) {
+            body { padding: 10px 8px; }
+            .container { padding: 0; }
+            .header { padding: 10px 12px; }
+            .header h1 { font-size: 20px; }
+            .lang-btn { font-size: 11px; padding: 4px 8px; }
+            .panel-body { padding: 14px; }
+            .btn { width: 100%; }
+            .chart-container { height: 240px; }
+            .export-buttons { gap: 8px; }
         }
     </style>
 </head>
@@ -1196,11 +1222,100 @@
                 sol2: sol2Data,
                 table: tableData
             };
-            
+
             updateChart();
             updateTable(tableData);
         }
-        
+
+        let lastBaseMargin = { t: 50, b: 80, l: 50, r: 20 };
+        let lastAnnotations = [];
+
+        function getResponsiveAdjustments(baseMargin = lastBaseMargin, annotations = lastAnnotations) {
+            const isPortrait = window.matchMedia && window.matchMedia('(orientation: portrait)').matches;
+            const isNarrow = window.innerWidth <= 768;
+            const isSmall = window.innerWidth <= 480;
+
+            const legend = isPortrait || isSmall
+                ? { orientation: 'v', x: 1.02, y: 1 }
+                : { orientation: 'h', x: 0, y: 1.15 };
+
+            const margin = {
+                t: isPortrait || isNarrow ? 35 : baseMargin.t,
+                b: isSmall ? 55 : (isPortrait || isNarrow ? 65 : baseMargin.b),
+                l: isPortrait ? 45 : baseMargin.l,
+                r: isPortrait || isSmall ? 10 : baseMargin.r
+            };
+
+            const xTitleSize = isSmall ? 10 : (isPortrait || isNarrow ? 12 : 14);
+            const tickFontSize = isSmall ? 10 : 11;
+            const yTickFontSize = isSmall ? 10 : 12;
+            const annotationFontSize = isSmall ? 10 : (isPortrait || isNarrow ? 11 : 12);
+
+            return {
+                legend,
+                margin,
+                xaxis: {
+                    titlefont: { size: xTitleSize },
+                    tickfont: { size: tickFontSize }
+                },
+                yaxis: {
+                    tickfont: { size: yTickFontSize }
+                },
+                annotations: annotations.map(a => ({
+                    ...a,
+                    font: { ...a.font, size: annotationFontSize }
+                }))
+            };
+        }
+
+        function composeResponsiveLayout(baseLayout) {
+            const responsive = getResponsiveAdjustments(baseLayout.margin, baseLayout.annotations || []);
+            return {
+                ...baseLayout,
+                legend: { ...baseLayout.legend, ...responsive.legend },
+                margin: { ...baseLayout.margin, ...responsive.margin },
+                xaxis: {
+                    ...baseLayout.xaxis,
+                    titlefont: { ...(baseLayout.xaxis?.titlefont || {}), ...responsive.xaxis.titlefont },
+                    tickfont: { ...(baseLayout.xaxis?.tickfont || {}), ...responsive.xaxis.tickfont }
+                },
+                yaxis: {
+                    ...baseLayout.yaxis,
+                    tickfont: { ...(baseLayout.yaxis?.tickfont || {}), ...responsive.yaxis.tickfont }
+                },
+                annotations: responsive.annotations
+            };
+        }
+
+        function relayoutChartResponsive(baseMargin = lastBaseMargin, annotations = lastAnnotations) {
+            const adjustments = getResponsiveAdjustments(baseMargin, annotations);
+            const chartEl = document.getElementById('chartContainer');
+            if (!chartEl || !chartEl.data) return;
+
+            Plotly.relayout('chartContainer', {
+                'legend.orientation': adjustments.legend.orientation,
+                'legend.x': adjustments.legend.x,
+                'legend.y': adjustments.legend.y,
+                margin: adjustments.margin,
+                'xaxis.titlefont.size': adjustments.xaxis.titlefont.size,
+                'xaxis.tickfont.size': adjustments.xaxis.tickfont.size,
+                'yaxis.tickfont.size': adjustments.yaxis.tickfont.size,
+                annotations: adjustments.annotations
+            });
+        }
+
+        const handleResize = () => relayoutChartResponsive();
+
+        const orientationMedia = window.matchMedia ? window.matchMedia('(orientation: portrait)') : null;
+        window.addEventListener('resize', handleResize);
+        if (orientationMedia) {
+            if (orientationMedia.addEventListener) {
+                orientationMedia.addEventListener('change', handleResize);
+            } else if (orientationMedia.addListener) {
+                orientationMedia.addListener(handleResize);
+            }
+        }
+
         function updateChart() {
             if (!currentTableData) return;
             
@@ -1278,8 +1393,8 @@
             const arrowTextAcid = ['ru', 'uk'].includes(currentLang) ? '◄ HNO₃, г/л' : '◄ HNO₃, g/L';
             const arrowTextAmmonia = ['ru', 'uk'].includes(currentLang) ? 'NH₃, г/л ►' : 'NH₃, g/L ►';
             
-            const layout = {
-                xaxis: { 
+            const baseLayout = {
+                xaxis: {
                     title: `← ${t.xAxisAcid}     |     ${t.xAxisAmmonia} →`,
                     range: [-52, 52],
                     zeroline: true,
@@ -1320,7 +1435,11 @@
                     }
                 ]
             };
-            
+
+            lastBaseMargin = baseLayout.margin;
+            lastAnnotations = baseLayout.annotations;
+            const layout = composeResponsiveLayout(baseLayout);
+
             Plotly.newPlot('chartContainer', traces, layout, { responsive: true });
 
             // Обновляем текст стрелок под графиком. Этот блок всегда отображается и не зависит от Plotly.
@@ -1439,15 +1558,17 @@
             
             // Инициализация пустого графика
             const t = i18n[currentLang];
-            Plotly.newPlot('chartContainer', [], {
-                xaxis: { 
-                    title: `← ${t.xAxisAcid}     |     ${t.xAxisAmmonia} →`, 
+            const baseLayout = {
+                xaxis: {
+                    title: `← ${t.xAxisAcid}     |     ${t.xAxisAmmonia} →`,
                     range: [-52, 52],
                     tickmode: 'array',
                     tickvals: [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50],
                     ticktext: ['63', '50', '38', '25', '13', '0', '3.4', '6.8', '10', '14', '17']
                 },
                 yaxis: { title: 'pH', range: [0, 10] },
+                legend: { x: 0, y: 1.15, orientation: 'h' },
+                margin: { t: 50, b: 80, l: 50, r: 20 },
                 annotations: [{
                     text: t.noData,
                     xref: 'paper', yref: 'paper',
@@ -1455,7 +1576,13 @@
                     showarrow: false,
                     font: { size: 16, color: '#999' }
                 }]
-            }, { responsive: true });
+            };
+
+            lastBaseMargin = baseLayout.margin;
+            lastAnnotations = baseLayout.annotations;
+            const layout = composeResponsiveLayout(baseLayout);
+
+            Plotly.newPlot('chartContainer', [], layout, { responsive: true });
         });
     </script>
 </body>

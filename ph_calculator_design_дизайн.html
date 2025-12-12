@@ -30,21 +30,54 @@
             --label-color: #555;
         }
 
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); padding: 20px; }
-        .container { max-width: 1400px; margin: 0 auto; }
-        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 20px; background: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--card-shadow); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: radial-gradient(circle at 20% 20%, #f6f8fb, #eef2f7 35%, #f7f9fc); padding: 20px; color: #1f2937; }
+        .container { max-width: 1260px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 15px 20px; background: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--card-shadow); border: 1px solid #e6e8ef; }
         .header h1 { color: var(--primary); font-size: 28px; display: flex; align-items: center; gap: 10px; }
         .lang-switcher { display: flex; gap: 5px; }
         .lang-btn { padding: 6px 12px; border: 1px solid #ccc; background: var(--card-bg); cursor: pointer; border-radius: 4px; font-size: 13px; transition: background 0.2s, color 0.2s, border-color 0.2s; }
         .lang-btn:hover { background: var(--bg-color); }
         .lang-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
-        
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.1fr 1fr;
+            gap: 16px;
+            margin-bottom: 18px;
+            padding: 16px 18px;
+            background: linear-gradient(135deg, #f4f1ff, #f8fbff);
+            border-radius: var(--border-radius);
+            border: 1px solid #e6e8ef;
+            box-shadow: var(--card-shadow);
+        }
+
+        .hero-title { font-size: 18px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+        .hero-desc { font-size: 13px; color: #4b5563; line-height: 1.5; }
+
+        .hero-chips {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            align-items: start;
+        }
+
+        .chip {
+            background: white;
+            border: 1px solid #e3e6ef;
+            border-radius: 10px;
+            padding: 10px 12px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+        }
+
+        .chip span { display: block; font-size: 12px; color: #6b7280; margin-bottom: 4px; }
+        .chip strong { display: block; font-size: 18px; color: #111827; }
+
         .main-grid { display: grid; grid-template-columns: 350px 1fr; gap: 20px; }
         .left-panel { display: flex; flex-direction: column; gap: 15px; }
         .right-panel { display: flex; flex-direction: column; gap: 15px; }
         
-        .panel { background: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--card-shadow); overflow: hidden; }
-        .panel-header { background: var(--primary); color: white; padding: 14px 18px; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+        .panel { background: var(--card-bg); border-radius: var(--border-radius); box-shadow: var(--card-shadow); overflow: hidden; border: 1px solid #e6e8ef; }
+        .panel-header { background: var(--primary); color: white; padding: 14px 18px; font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; letter-spacing: 0.2px; }
         /* Цветные панели для разных разделов */
         .panel-header.green { background: var(--secondary); }
         .panel-header.orange { background: var(--accent); }
@@ -100,13 +133,15 @@
         .data-table tr.zone-neutral { background: #fff7e6; }
         .data-table tr.zone-ammonia { background: #eaf5ec; }
         
-        .table-wrapper { max-height: 400px; overflow-y: auto; }
+        .table-wrapper { max-height: 400px; overflow-y: auto; overflow-x: auto; border: 1px solid #e6e8ef; border-radius: 10px; }
+        .data-table thead th { position: sticky; top: 0; z-index: 1; }
 
         .export-buttons { display: flex; gap: 10px; margin-top: 10px; }
         .export-buttons .btn { font-size: 12px; padding: 8px 15px; }
 
         @media (max-width: 1200px) {
             .main-grid { grid-template-columns: 1fr; }
+            .hero { grid-template-columns: 1fr; }
         }
 
         @media (max-width: 768px) {
@@ -116,6 +151,7 @@
             .header h1 { font-size: 22px; }
             .lang-btn { font-size: 12px; padding: 5px 10px; }
             .main-grid { grid-template-columns: 1fr; gap: 14px; }
+            .hero { grid-template-columns: 1fr; padding: 14px; gap: 12px; }
             .panel-body { padding: 16px; }
             .form-row { grid-template-columns: 1fr; }
             .chart-container { height: 280px; }
@@ -154,6 +190,31 @@
             </div>
         </div>
         
+        <div class="hero">
+            <div>
+                <div class="hero-title" data-i18n="quickSummary">Сводка ввода</div>
+                <p class="hero-desc" data-i18n="quickHint">Следите за актуальными параметрами перед расчётом и построением графиков.</p>
+            </div>
+            <div class="hero-chips">
+                <div class="chip">
+                    <span data-i18n="temp">Температура (°C)</span>
+                    <strong id="chipTemp">—</strong>
+                </div>
+                <div class="chip">
+                    <span data-i18n="concSaltpeterShort">C селитры (%)</span>
+                    <strong id="chipSalt">—</strong>
+                </div>
+                <div class="chip">
+                    <span data-i18n="concAcid">Конц. кислоты (г/л)</span>
+                    <strong id="chipAcid">—</strong>
+                </div>
+                <div class="chip">
+                    <span data-i18n="concAmmonia">Конц. аммиака (г/л)</span>
+                    <strong id="chipAmmonia">—</strong>
+                </div>
+            </div>
+        </div>
+
         <div class="main-grid">
             <div class="left-panel">
                 <!-- Константы -->
@@ -449,6 +510,8 @@
         const i18n = {
             ru: {
                 title: "Калькулятор pH аммиачной селитры",
+                quickSummary: "Сводка ввода",
+                quickHint: "Следите за актуальными параметрами перед расчётом и построением графиков.",
                 constants: "Константы",
                 phNeutralRef: "pH нейтр. эталон",
                 kAcid: "К кислой обл.",
@@ -523,6 +586,8 @@
             },
             en: {
                 title: "Ammonium Nitrate pH Calculator",
+                quickSummary: "Input snapshot",
+                quickHint: "Keep current values in sight before running calculations and charts.",
                 constants: "Constants",
                 phNeutralRef: "pH neutral ref.",
                 kAcid: "K acid zone",
@@ -597,6 +662,8 @@
             },
             uk: {
                 title: "Калькулятор pH аміачної селітри",
+                quickSummary: "Зведення вводу",
+                quickHint: "Контролюйте актуальні параметри перед розрахунком і побудовою графіків.",
                 constants: "Константи",
                 phNeutralRef: "pH нейтр. еталон",
                 kAcid: "К кислої обл.",
@@ -671,6 +738,8 @@
             },
             es: {
                 title: "Calculadora de pH de Nitrato de Amonio",
+                quickSummary: "Resumen de entrada",
+                quickHint: "Mantén a la vista los valores antes de calcular y generar gráficos.",
                 constants: "Constantes",
                 phNeutralRef: "pH neutro ref.",
                 kAcid: "K zona ácida",
@@ -809,6 +878,31 @@
                 conc_ref: parseNumber(document.getElementById('concRef').value, 10),
                 conc_coeff: parseNumber(document.getElementById('concCoeff').value, 0.016)
             };
+        }
+
+        // ===== ВСПОМОГАТЕЛЬНЫЕ ОТРИСОВКИ =====
+        function updateHeroSummary() {
+            const formatValue = (value, suffix = '') => {
+                if (value === undefined || value === null || value === '') {
+                    return '—';
+                }
+                return `${value}${suffix}`;
+            };
+
+            const tempEl = document.getElementById('directTemp');
+            const saltEl = document.getElementById('directConcSaltpeter');
+            const acidEl = document.getElementById('concAcid');
+            const ammoniaEl = document.getElementById('concAmmonia');
+
+            const chipTemp = document.getElementById('chipTemp');
+            const chipSalt = document.getElementById('chipSalt');
+            const chipAcid = document.getElementById('chipAcid');
+            const chipAmmonia = document.getElementById('chipAmmonia');
+
+            if (chipTemp) chipTemp.textContent = formatValue(tempEl?.value, '°C');
+            if (chipSalt) chipSalt.textContent = formatValue(saltEl?.value, '%');
+            if (chipAcid) chipAcid.textContent = formatValue(acidEl?.value, ' г/л');
+            if (chipAmmonia) chipAmmonia.textContent = formatValue(ammoniaEl?.value, ' г/л');
         }
         
         // ===== ФУНКЦИИ РАСЧЁТА (перенесены из Python) =====
@@ -1554,6 +1648,14 @@
             if (savedLang && i18n[savedLang]) {
                 setLanguage(savedLang);
             }
+            const summaryInputs = ['directTemp', 'directConcSaltpeter', 'concAcid', 'concAmmonia'];
+            summaryInputs.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', updateHeroSummary);
+                }
+            });
+            updateHeroSummary();
             updateDilutedConc();
             
             // Инициализация пустого графика

@@ -1,0 +1,1520 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Калибровка pH (логарифмическая)</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; padding: 10px; }
+        .container { max-width: 1600px; margin: 0 auto; }
+        .header { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 10px; padding: 8px 15px; 
+            background: white; border-radius: 8px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .header h1 { color: #6a1b9a; font-size: 16px; }
+        .header-buttons { display: flex; gap: 10px; }
+        
+        .main-grid { display: grid; grid-template-columns: 280px 1fr; gap: 10px; }
+        .left-panel { display: flex; flex-direction: column; gap: 8px; }
+        .right-panel { display: flex; flex-direction: column; gap: 8px; }
+        
+        .graph-controls-row { display: grid; grid-template-columns: 1fr 250px; gap: 10px; }
+        
+        .panel { background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow: hidden; }
+        .panel-header { 
+            background: #1565c0; color: white; 
+            padding: 8px 12px; font-weight: 600; font-size: 12px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .panel-header.green { background: #2e7d32; }
+        .panel-header.orange { background: #ef6c00; }
+        .panel-header.purple { background: #6a1b9a; }
+        .panel-body { padding: 10px; }
+        
+        .form-group { margin-bottom: 8px; }
+        .form-group label { display: block; font-size: 10px; color: #666; margin-bottom: 2px; }
+        .form-group input, .form-group select { 
+            width: 100%; padding: 5px 6px; border: 1px solid #ddd; 
+            border-radius: 4px; font-size: 11px; 
+        }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        
+        .btn { 
+            padding: 6px 12px; border: none; border-radius: 5px; 
+            cursor: pointer; font-size: 11px; font-weight: 500; 
+            transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px;
+        }
+        .btn-primary { background: #1565c0; color: white; }
+        .btn-primary:hover { background: #0d47a1; }
+        .btn-success { background: #2e7d32; color: white; }
+        .btn-success:hover { background: #1b5e20; }
+        .btn-orange { background: #ef6c00; color: white; }
+        .btn-orange:hover { background: #e65100; }
+        .btn-purple { background: #6a1b9a; color: white; }
+        .btn-purple:hover { background: #4a148c; }
+        .btn-outline { background: white; border: 1px solid #ddd; color: #333; }
+        .btn-outline:hover { border-color: #1565c0; color: #1565c0; }
+        .btn-sm { padding: 5px 10px; font-size: 11px; }
+        
+        .dropzone { 
+            border: 2px dashed #ddd; border-radius: 8px; 
+            padding: 15px; text-align: center; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .dropzone:hover { border-color: #6a1b9a; background: #f8f9fa; }
+        .dropzone-icon { font-size: 28px; margin-bottom: 5px; }
+        .dropzone-text { font-size: 11px; color: #666; }
+        .hidden { display: none; }
+        
+        /* Таблица */
+        .data-table-wrapper { max-height: 280px; overflow-y: auto; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+        .data-table th, .data-table td { 
+            padding: 4px 3px; border: 1px solid #e0e0e0; text-align: center; 
+        }
+        .data-table th { background: #f5f5f5; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+        .data-table tr:hover { background: #f8f9fa; }
+        .data-table tr.excluded { background: #ffebee; text-decoration: line-through; opacity: 0.6; }
+        .data-table tr.outlier { background: #fff3e0; }
+        
+        /* График */
+        .chart-container { height: 100%; min-height: 260px; }
+        
+        /* Режим оптимизации */
+        .mode-switcher { 
+            display: flex; gap: 5px; background: #f5f5f5; 
+            padding: 4px; border-radius: 6px; 
+        }
+        .mode-btn { 
+            flex: 1; padding: 6px; border: none; border-radius: 4px; 
+            cursor: pointer; font-size: 10px; background: transparent; 
+            transition: all 0.2s;
+        }
+        .mode-btn.active { background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); color: #1565c0; }
+        
+        /* Слайдеры */
+        .slider-group { margin-bottom: 8px; }
+        .slider-header { display: flex; justify-content: space-between; margin-bottom: 3px; }
+        .slider-label { font-size: 11px; color: #333; }
+        .slider-value { font-size: 11px; font-weight: bold; color: #6a1b9a; }
+        .slider { width: 100%; cursor: pointer; }
+        
+        /* Редактируемое значение */
+        .editable-value { 
+            cursor: pointer; padding: 2px 4px; border-radius: 3px;
+            transition: background 0.2s;
+        }
+        .editable-value:hover { background: #e3f2fd; }
+        
+        /* Тонкая регулировка */
+        .fine-tune { 
+            display: flex; gap: 2px; margin-top: 4px; 
+            align-items: center; justify-content: center;
+        }
+        .fine-btn {
+            width: 24px; height: 18px; 
+            border: 1px solid #ddd; border-radius: 3px;
+            background: white; cursor: pointer; font-size: 8px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0;
+        }
+        .fine-btn:hover { background: #e3f2fd; border-color: #1565c0; }
+        .fine-btn.minus { color: #f44336; }
+        .fine-btn.plus { color: #4caf50; }
+        .fine-label { font-size: 8px; color: #999; margin: 0 1px; }
+        
+        /* Редактируемые ячейки */
+        .editable-cell { cursor: text; }
+        .editable-cell:hover { background: #e3f2fd; }
+        .editable-cell input {
+            width: 100%; border: 1px solid #1565c0;
+            padding: 2px; font-size: 10px;
+            text-align: center; border-radius: 2px;
+        }
+        
+        /* Формула */
+        .formula-box { 
+            background: #f3e5f5; padding: 8px; border-radius: 6px; 
+            font-family: monospace; text-align: center; font-size: 11px;
+            border-left: 4px solid #6a1b9a;
+        }
+        
+        /* Уставки */
+        .settings-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .setting-item { 
+            background: #f5f5f5; padding: 6px; border-radius: 4px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .setting-item label { font-size: 10px; color: #666; }
+        .setting-item input { 
+            width: 60px; padding: 3px; border: 1px solid #ddd; 
+            border-radius: 3px; text-align: right; font-size: 11px;
+        }
+        
+        /* Зоны */
+        .zone-acid { color: #c62828; }
+        .zone-ammonia { color: #2e7d32; }
+        .zone-neutral { color: #ff8f00; }
+        
+        @media (max-width: 1200px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .graph-controls-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Калибровка pH (логарифмическая модель по соотношению токов)</h1>
+            <div class="header-buttons">
+                <button class="btn btn-outline btn-sm" onclick="loadExample()">📋 Пример</button>
+                <button class="btn btn-outline btn-sm" onclick="showHistory()">📜 История</button>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <div class="left-panel">
+                <!-- Загрузка данных -->
+                <div class="panel">
+                    <div class="panel-header">📁 Загрузка данных</div>
+                    <div class="panel-body">
+                        <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+                            <div class="dropzone-icon">📄</div>
+                            <div class="dropzone-text">CSV: I_катод; I_анод; C_лаб; pH_лаб</div>
+                        </div>
+                        <input type="file" id="fileInput" class="hidden" accept=".csv,.txt" onchange="handleFile(this.files[0])">
+                        
+                        <div class="form-row" style="margin-top: 8px;">
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Разделитель</label>
+                                <select id="delimiter">
+                                    <option value=";" selected>;</option>
+                                    <option value=",">,</option>
+                                    <option value="\t">Tab</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom:0;">
+                                <label>Порог выбросов (%)</label>
+                                <input type="number" id="outlierThreshold" value="15" min="1" max="50">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Уставки -->
+                <div class="panel">
+                    <div class="panel-header purple">⚗️ Уставки C ↔ pH</div>
+                    <div class="panel-body">
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label>pH нейтр.</label>
+                                <input type="number" id="phNeutral" value="4.5" step="0.1" oninput="recalculateFromSettings()">
+                            </div>
+                            <div class="setting-item">
+                                <label>K кислоты</label>
+                                <input type="number" id="kAcid" value="2.9" step="0.1" oninput="recalculateFromSettings()">
+                            </div>
+                            <div class="setting-item">
+                                <label>K аммиака</label>
+                                <input type="number" id="kAmmonia" value="7.1" step="0.1" oninput="recalculateFromSettings()">
+                            </div>
+                            <div class="setting-item">
+                                <label>Мёртв. зона</label>
+                                <input type="number" id="deadZone" value="0.3" step="0.05" oninput="recalculateFromSettings()">
+                            </div>
+                        </div>
+                        <div style="margin-top:8px; font-size:9px; color:#666; line-height:1.4;">
+                            <b>Кислая:</b> pH = -Log(C) + K_acid<br>
+                            <b>Аммиачная:</b> pH = Log(C) + K_ammonia
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Таблица данных -->
+                <div class="panel" style="flex:1;">
+                    <div class="panel-header green">
+                        📋 Данные (<span id="pointCount">0</span>)
+                        <button class="btn btn-sm" style="background:white;color:#2e7d32;padding:2px 6px;font-size:10px;margin-left:auto;" onclick="addDataRow()">+</button>
+                    </div>
+                    <div class="panel-body" style="padding:8px;">
+                        <div class="data-table-wrapper">
+                            <table class="data-table" id="dataTable">
+                                <thead>
+                                    <tr>
+                                        <th style="width:16px;">№</th>
+                                        <th>I<sub>кат</sub></th>
+                                        <th>I<sub>ан</sub></th>
+                                        <th>C<sub>лаб</sub></th>
+                                        <th>C<sub>пр</sub></th>
+                                        <th>ΔC</th>
+                                        <th>pH<sub>лаб</sub></th>
+                                        <th>pH<sub>пр</sub></th>
+                                        <th>ΔpH</th>
+                                        <th style="width:18px;">✓</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody">
+                                    <tr><td colspan="10" style="color:#999; padding:15px;">Загрузите данные</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top:6px; font-size:10px; color:#666;">
+                            <span id="loadedFileName" style="color:#6a1b9a;"></span>
+                            Искл: <span id="excludedCount">0</span> | Выбр: <span id="outlierCount">0</span>
+                            <span style="float:right;">Клик = редакт.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="right-panel">
+                <!-- График + Параметры -->
+                <div class="graph-controls-row" style="flex:1;">
+                    <!-- Два графика -->
+                    <div class="panel" style="display:flex; flex-direction:column;">
+                        <div class="panel-body" style="flex:1; padding:6px;">
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; height:100%;">
+                                <div>
+                                    <div style="text-align:center; font-weight:bold; color:#1565c0; font-size:11px; margin-bottom:2px;">📊 КОНЦЕНТРАЦИЯ</div>
+                                    <div class="chart-container" id="chartConcentration"></div>
+                                </div>
+                                <div>
+                                    <div style="text-align:center; font-weight:bold; color:#6a1b9a; font-size:11px; margin-bottom:2px;">📈 pH</div>
+                                    <div class="chart-container" id="chartPh"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Параметры калибровки -->
+                    <div class="panel">
+                        <div class="panel-header purple" style="padding:8px 12px;">⚙️ Калибровка</div>
+                        <div class="panel-body" style="padding:8px;">
+                            <!-- Режимы -->
+                            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                <div class="mode-switcher" style="flex:1;">
+                                    <button class="mode-btn active" id="optConc" onclick="setOptMode('conc')">📊 C</button>
+                                    <button class="mode-btn" id="optPh" onclick="setOptMode('ph')">📈 pH</button>
+                                </div>
+                                <div class="mode-switcher" style="flex:1;">
+                                    <button class="mode-btn active" id="modeAuto" onclick="setMode('auto')">🤖 Авто</button>
+                                    <button class="mode-btn" id="modeManual" onclick="setMode('manual')">✋ Ручн</button>
+                                </div>
+                            </div>
+                            
+                            <!-- k1 (катод) -->
+                            <div class="slider-group">
+                                <div class="slider-header">
+                                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                                        <input type="checkbox" id="lockK1" onchange="toggleLock('k1')">
+                                        <span class="slider-label" style="color:#c62828;">k<sub>1</sub> (кат)</span>
+                                    </label>
+                                    <span class="slider-value editable-value" id="k1Value" onclick="startEditParam('k1')">1.0000</span>
+                                </div>
+                                <input type="range" class="slider" id="k1Slider" 
+                                       min="-10" max="10" step="0.01" value="1"
+                                       oninput="updateFromSlider('k1')">
+                                <div class="fine-tune">
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k1', -1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−1</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k1', -0.1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.1</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k1', -0.01)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.01</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k1', -0.001)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.001</button>
+                                    <span class="fine-label">|</span>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k1', 0.001)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.001</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k1', 0.01)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.01</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k1', 0.1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.1</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k1', 1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+1</button>
+                                </div>
+                            </div>
+                            
+                            <!-- k2 (анод) -->
+                            <div class="slider-group">
+                                <div class="slider-header">
+                                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                                        <input type="checkbox" id="lockK2" onchange="toggleLock('k2')">
+                                        <span class="slider-label" style="color:#2e7d32;">k<sub>2</sub> (ан)</span>
+                                    </label>
+                                    <span class="slider-value editable-value" id="k2Value" onclick="startEditParam('k2')">1.0000</span>
+                                </div>
+                                <input type="range" class="slider" id="k2Slider" 
+                                       min="-10" max="10" step="0.01" value="1"
+                                       oninput="updateFromSlider('k2')">
+                                <div class="fine-tune">
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k2', -1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−1</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k2', -0.1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.1</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k2', -0.01)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.01</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('k2', -0.001)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.001</button>
+                                    <span class="fine-label">|</span>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k2', 0.001)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.001</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k2', 0.01)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.01</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k2', 0.1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.1</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('k2', 1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+1</button>
+                                </div>
+                            </div>
+                            
+                            <!-- b (смещение) -->
+                            <div class="slider-group">
+                                <div class="slider-header">
+                                    <label style="display:flex; align-items:center; gap:4px; cursor:pointer;">
+                                        <input type="checkbox" id="lockB" onchange="toggleLock('b')">
+                                        <span class="slider-label" style="color:#6a1b9a;">b</span>
+                                    </label>
+                                    <span class="slider-value editable-value" id="bValue" onclick="startEditParam('b')">4.5000</span>
+                                </div>
+                                <input type="range" class="slider" id="bSlider" 
+                                       min="-10" max="10" step="0.01" value="4.5"
+                                       oninput="updateFromSlider('b')">
+                                <div class="fine-tune">
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('b', -1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−1</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('b', -0.1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.1</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('b', -0.01)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.01</button>
+                                    <button class="fine-btn minus" onmousedown="startFineAdjust('b', -0.001)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">−.001</button>
+                                    <span class="fine-label">|</span>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('b', 0.001)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.001</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('b', 0.01)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.01</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('b', 0.1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+.1</button>
+                                    <button class="fine-btn plus" onmousedown="startFineAdjust('b', 1)" onmouseup="stopFineAdjust()" onmouseleave="stopFineAdjust()">+1</button>
+                                </div>
+                            </div>
+                            
+                            <div style="display:flex; gap:5px; margin-top:8px;">
+                                <button class="btn btn-purple btn-sm" onclick="autoCalibrate()" style="flex:1; padding:6px;">🔄 Авто</button>
+                                <button class="btn btn-outline btn-sm" onclick="resetParams()" style="flex:1; padding:6px;">↩️ Сброс</button>
+                            </div>
+                            
+                            <div class="formula-box" id="formulaBox" style="margin-top:8px;">
+                                pH = <b>1.000</b>·log|I<sub>кат</sub>| + <b>1.000</b>·log|I<sub>ан</sub>| + <b>4.500</b>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Результаты -->
+                <div class="panel">
+                    <div class="panel-body" style="padding:8px 12px;">
+                        <div style="display:flex; align-items:center; gap:15px; flex-wrap:wrap;">
+                            <div style="font-weight:bold; color:#2e7d32; font-size:12px;">✅ Результаты:</div>
+                            <div style="display:flex; gap:15px;">
+                                <div><span style="color:#666; font-size:11px;">R²:</span> <b id="resultR2">—</b></div>
+                                <div><span style="color:#666; font-size:11px;" id="rmseLabel">RMSE:</span> <b id="resultRMSE">—</b></div>
+                                <div><span style="color:#666; font-size:11px;" id="maxErrLabel">Макс:</span> <b id="resultMaxErr">—</b></div>
+                            </div>
+                            <div style="margin-left:auto; display:flex; gap:5px;">
+                                <button class="btn btn-success btn-sm" onclick="exportCSV()" style="padding:4px 8px;">💾 CSV</button>
+                                <button class="btn btn-success btn-sm" onclick="exportExcel()" style="padding:4px 8px;">📊 Excel</button>
+                                <button class="btn btn-purple btn-sm" onclick="saveCalibration()" style="padding:4px 8px;">💾 Сохр</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Модальное окно истории -->
+    <div id="historyModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:white; border-radius:10px; padding:20px; max-width:500px; width:90%; max-height:80vh; overflow-y:auto;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="color:#6a1b9a;">📜 История калибровок</h3>
+                <button onclick="closeHistory()" style="background:none; border:none; font-size:20px; cursor:pointer;">✕</button>
+            </div>
+            <div style="display:flex; gap:8px; margin-bottom:15px; padding-bottom:15px; border-bottom:1px solid #eee;">
+                <button class="btn btn-sm btn-primary" onclick="exportHistory()">📥 Экспорт</button>
+                <button class="btn btn-sm btn-outline" onclick="document.getElementById('historyFileInput').click()">📤 Импорт</button>
+                <input type="file" id="historyFileInput" accept=".json" style="display:none;" onchange="importHistory(this)">
+                <button class="btn btn-sm" style="background:#f44336; color:white; margin-left:auto;" onclick="clearHistory()">🗑 Очистить</button>
+            </div>
+            <div id="historyList"></div>
+        </div>
+    </div>
+
+    <script>
+        // ===== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =====
+        let rawData = [];
+        let excludedIndices = [];
+        
+        // Параметры калибровки: pH = k1*log|I_кат| + k2*log|I_ан| + b
+        let currentK1 = 1.0;
+        let currentK2 = 1.0;
+        let currentB = 4.5;
+        
+        // Авто-значения
+        let autoK1 = 1.0;
+        let autoK2 = 1.0;
+        let autoB = 4.5;
+        
+        // Блокировка параметров
+        let lockedK1 = false;
+        let lockedK2 = false;
+        let lockedB = false;
+        
+        let currentMode = 'auto'; // auto / manual
+        let optimizationMode = 'ph'; // conc / ph
+        
+        let fineAdjustInterval = null;
+        const EPS = 0.001; // защита от log(0)
+        
+        // ===== УСТАВКИ =====
+        function getSettings() {
+            return {
+                phNeutral: parseFloat(document.getElementById('phNeutral').value) || 4.5,
+                kAcid: parseFloat(document.getElementById('kAcid').value) || 2.9,
+                kAmmonia: parseFloat(document.getElementById('kAmmonia').value) || 7.1,
+                deadZone: parseFloat(document.getElementById('deadZone').value) || 0.3
+            };
+        }
+        
+        // ===== ЛОГАРИФМ С ЗАЩИТОЙ =====
+        function safeLog(x) {
+            return Math.log10(Math.abs(x) + EPS);
+        }
+        
+        // ===== РАСЧЁТ pH ПО ФОРМУЛЕ =====
+        function calculatePh(iCathode, iAnode) {
+            return currentK1 * safeLog(iCathode) + currentK2 * safeLog(iAnode) + currentB;
+        }
+        
+        // ===== ПЕРЕСЧЁТ C ↔ pH =====
+        function getZone(ph, settings) {
+            if (ph < settings.phNeutral - settings.deadZone / 2) return 'acid';
+            if (ph > settings.phNeutral + settings.deadZone / 2) return 'ammonia';
+            return 'neutral';
+        }
+        
+        function phToConcentration(ph, settings) {
+            const zone = getZone(ph, settings);
+            if (zone === 'acid') {
+                return Math.pow(10, settings.kAcid - ph);
+            } else if (zone === 'ammonia') {
+                return Math.pow(10, ph - settings.kAmmonia);
+            }
+            return 0;
+        }
+        
+        function concentrationToPhByZone(c, zone, settings) {
+            if (c <= 0) return settings.phNeutral;
+            if (zone === 'acid') {
+                return -Math.log10(c) + settings.kAcid;
+            } else {
+                return Math.log10(c) + settings.kAmmonia;
+            }
+        }
+        
+        // ===== ЗАГРУЗКА ФАЙЛА =====
+        function handleFile(file) {
+            if (!file) return;
+            document.getElementById('loadedFileName').textContent = file.name + ' ';
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                parseCSV(e.target.result);
+            };
+            reader.readAsText(file);
+        }
+        
+        function parseCSV(text) {
+            const delimiter = document.getElementById('delimiter').value;
+            const lines = text.split('\n').filter(line => line.trim() && !line.trim().startsWith('#'));
+            
+            if (lines.length < 2) {
+                alert('Файл пуст или неверный формат');
+                return;
+            }
+            
+            const dataLines = lines.slice(1);
+            const settings = getSettings();
+            
+            rawData = [];
+            
+            for (const line of dataLines) {
+                const parts = line.split(delimiter).map(p => p.trim().replace(',', '.'));
+                if (parts.length < 3) continue;
+                
+                const iCathode = parseFloat(parts[0]) || 0;
+                const iAnode = parseFloat(parts[1]) || 0;
+                let cLab = parts[2] !== '' ? parseFloat(parts[2]) : null;
+                let phLab = parts.length > 3 && parts[3] !== '' ? parseFloat(parts[3]) : null;
+                
+                let zone = 'neutral';
+                let cLabCalculated = false;
+                
+                if (phLab !== null) {
+                    zone = getZone(phLab, settings);
+                    if (cLab === null) {
+                        cLab = phToConcentration(phLab, settings);
+                        cLabCalculated = true;
+                    }
+                } else if (cLab !== null) {
+                    zone = cLab < 0 ? 'acid' : 'ammonia';
+                    cLab = Math.abs(cLab);
+                    phLab = concentrationToPhByZone(cLab, zone, settings);
+                }
+                
+                if (phLab === null) continue;
+                
+                rawData.push({
+                    iCathode,
+                    iAnode,
+                    logCathode: safeLog(iCathode),
+                    logAnode: safeLog(iAnode),
+                    cLab: cLab || 0,
+                    phLab,
+                    zone,
+                    cLabCalculated,
+                    isOutlier: false
+                });
+            }
+            
+            excludedIndices = [];
+            
+            if (rawData.length > 0) {
+                autoCalibrate();
+            } else {
+                updateAll();
+            }
+        }
+        
+        // ===== АВТОКАЛИБРОВКА =====
+        function autoCalibrate() {
+            const activeData = rawData.filter((_, i) => !excludedIndices.includes(i));
+            
+            if (activeData.length < 3) {
+                alert('Нужно минимум 3 точки для калибровки');
+                return;
+            }
+            
+            if (optimizationMode === 'ph') {
+                optimizeByPh(activeData);
+            } else {
+                optimizeByConcentration(activeData);
+            }
+            
+            // Применяем авто-значения к незаблокированным параметрам
+            if (currentMode === 'auto') {
+                if (!lockedK1) currentK1 = autoK1;
+                if (!lockedK2) currentK2 = autoK2;
+                if (!lockedB) currentB = autoB;
+            }
+            
+            updateSliders();
+            updateFormula();
+            detectOutliers();
+            updateAll();
+        }
+        
+        // Оптимизация по pH (множественная линейная регрессия)
+        function optimizeByPh(data) {
+            // pH = k1*x1 + k2*x2 + b, где x1=log|I_кат|, x2=log|I_ан|
+            const n = data.length;
+            
+            let sumX1 = 0, sumX2 = 0, sumY = 0;
+            let sumX1X1 = 0, sumX2X2 = 0, sumX1X2 = 0;
+            let sumX1Y = 0, sumX2Y = 0;
+            
+            for (const point of data) {
+                const x1 = lockedK1 ? 0 : point.logCathode;
+                const x2 = lockedK2 ? 0 : point.logAnode;
+                const y = point.phLab - (lockedK1 ? currentK1 * point.logCathode : 0) 
+                                      - (lockedK2 ? currentK2 * point.logAnode : 0)
+                                      - (lockedB ? currentB : 0);
+                
+                sumX1 += x1; sumX2 += x2; sumY += y;
+                sumX1X1 += x1 * x1; sumX2X2 += x2 * x2; sumX1X2 += x1 * x2;
+                sumX1Y += x1 * y; sumX2Y += x2 * y;
+            }
+            
+            // Решаем систему методом Крамера
+            const nFree = (!lockedK1 ? 1 : 0) + (!lockedK2 ? 1 : 0) + (!lockedB ? 1 : 0);
+            
+            if (nFree === 3) {
+                // Все параметры свободны
+                const A = [
+                    [n, sumX1, sumX2],
+                    [sumX1, sumX1X1, sumX1X2],
+                    [sumX2, sumX1X2, sumX2X2]
+                ];
+                const B = [sumY, sumX1Y, sumX2Y];
+                
+                const det = det3(A);
+                if (Math.abs(det) > 1e-10) {
+                    autoB = det3([[B[0], sumX1, sumX2], [B[1], sumX1X1, sumX1X2], [B[2], sumX1X2, sumX2X2]]) / det;
+                    autoK1 = det3([[n, B[0], sumX2], [sumX1, B[1], sumX1X2], [sumX2, B[2], sumX2X2]]) / det;
+                    autoK2 = det3([[n, sumX1, B[0]], [sumX1, sumX1X1, B[1]], [sumX2, sumX1X2, B[2]]]) / det;
+                }
+            } else if (nFree === 2) {
+                // Один параметр заблокирован
+                if (lockedB) {
+                    // k1, k2 свободны
+                    const det = sumX1X1 * sumX2X2 - sumX1X2 * sumX1X2;
+                    if (Math.abs(det) > 1e-10) {
+                        autoK1 = (sumX1Y * sumX2X2 - sumX2Y * sumX1X2) / det;
+                        autoK2 = (sumX2Y * sumX1X1 - sumX1Y * sumX1X2) / det;
+                    }
+                } else if (lockedK1) {
+                    // k2, b свободны
+                    const det = n * sumX2X2 - sumX2 * sumX2;
+                    if (Math.abs(det) > 1e-10) {
+                        autoB = (sumY * sumX2X2 - sumX2Y * sumX2) / det;
+                        autoK2 = (n * sumX2Y - sumX2 * sumY) / det;
+                    }
+                } else if (lockedK2) {
+                    // k1, b свободны
+                    const det = n * sumX1X1 - sumX1 * sumX1;
+                    if (Math.abs(det) > 1e-10) {
+                        autoB = (sumY * sumX1X1 - sumX1Y * sumX1) / det;
+                        autoK1 = (n * sumX1Y - sumX1 * sumY) / det;
+                    }
+                }
+            } else if (nFree === 1) {
+                // Два параметра заблокированы
+                if (!lockedK1) {
+                    autoK1 = sumX1X1 > 0 ? sumX1Y / sumX1X1 : currentK1;
+                } else if (!lockedK2) {
+                    autoK2 = sumX2X2 > 0 ? sumX2Y / sumX2X2 : currentK2;
+                } else if (!lockedB) {
+                    autoB = n > 0 ? sumY / n : currentB;
+                }
+            }
+            
+            // Ограничения
+            autoK1 = Math.max(-10, Math.min(10, autoK1));
+            autoK2 = Math.max(-10, Math.min(10, autoK2));
+            autoB = Math.max(-10, Math.min(10, autoB));
+        }
+        
+        // Оптимизация по концентрации (градиентный спуск)
+        function optimizeByConcentration(data) {
+            const settings = getSettings();
+            
+            // Начинаем с оптимизации по pH
+            optimizeByPh(data);
+            let k1 = lockedK1 ? currentK1 : autoK1;
+            let k2 = lockedK2 ? currentK2 : autoK2;
+            let b = lockedB ? currentB : autoB;
+            
+            // Градиентный спуск по концентрации
+            let learningRate = 0.001;
+            const iterations = 5000;
+            let prevLoss = Infinity;
+            
+            for (let iter = 0; iter < iterations; iter++) {
+                let gradK1 = 0, gradK2 = 0, gradB = 0;
+                let loss = 0;
+                
+                for (const point of data) {
+                    const phCalc = k1 * point.logCathode + k2 * point.logAnode + b;
+                    const zoneCalc = getZone(phCalc, settings);
+                    const cCalc = phToConcentration(phCalc, settings);
+                    
+                    // Знаковая концентрация
+                    const cCalcSigned = zoneCalc === 'acid' ? -cCalc : cCalc;
+                    const cLabSigned = point.zone === 'acid' ? -point.cLab : point.cLab;
+                    
+                    const error = cCalcSigned - cLabSigned;
+                    loss += error * error;
+                    
+                    // dC/dpH зависит от зоны
+                    let dC_dpH;
+                    if (zoneCalc === 'acid') {
+                        dC_dpH = -cCalc * Math.LN10;
+                    } else if (zoneCalc === 'ammonia') {
+                        dC_dpH = cCalc * Math.LN10;
+                    } else {
+                        continue;
+                    }
+                    
+                    // Градиенты
+                    if (!lockedK1) gradK1 += 2 * error * dC_dpH * point.logCathode;
+                    if (!lockedK2) gradK2 += 2 * error * dC_dpH * point.logAnode;
+                    if (!lockedB) gradB += 2 * error * dC_dpH;
+                }
+                
+                // Adaptive learning rate
+                if (loss < prevLoss) {
+                    learningRate *= 1.05;
+                } else {
+                    learningRate *= 0.5;
+                }
+                learningRate = Math.max(1e-6, Math.min(0.01, learningRate));
+                prevLoss = loss;
+                
+                const norm = Math.sqrt(gradK1**2 + gradK2**2 + gradB**2) || 1;
+                
+                if (!lockedK1) k1 -= learningRate * gradK1 / norm;
+                if (!lockedK2) k2 -= learningRate * gradK2 / norm;
+                if (!lockedB) b -= learningRate * gradB / norm;
+                
+                k1 = Math.max(-10, Math.min(10, k1));
+                k2 = Math.max(-10, Math.min(10, k2));
+                b = Math.max(-10, Math.min(10, b));
+                
+                if (norm < 1e-10) break;
+            }
+            
+            autoK1 = k1;
+            autoK2 = k2;
+            autoB = b;
+        }
+        
+        // Определитель 3x3
+        function det3(m) {
+            return m[0][0]*(m[1][1]*m[2][2] - m[1][2]*m[2][1])
+                 - m[0][1]*(m[1][0]*m[2][2] - m[1][2]*m[2][0])
+                 + m[0][2]*(m[1][0]*m[2][1] - m[1][1]*m[2][0]);
+        }
+        
+        // ===== ДЕТЕКЦИЯ ВЫБРОСОВ =====
+        function detectOutliers() {
+            const threshold = parseFloat(document.getElementById('outlierThreshold').value) / 100;
+            const settings = getSettings();
+            let count = 0;
+            
+            rawData.forEach((point, i) => {
+                if (excludedIndices.includes(i)) {
+                    point.isOutlier = false;
+                    return;
+                }
+                
+                const phCalc = calculatePh(point.iCathode, point.iAnode);
+                
+                if (optimizationMode === 'ph') {
+                    const error = Math.abs(phCalc - point.phLab);
+                    point.isOutlier = error > threshold * 2; // 2 единицы pH при 100%
+                } else {
+                    const cCalc = phToConcentration(phCalc, settings);
+                    const error = Math.abs(cCalc - point.cLab);
+                    const relError = point.cLab !== 0 ? error / point.cLab : 0;
+                    point.isOutlier = relError > threshold;
+                }
+                
+                if (point.isOutlier) count++;
+            });
+            
+            document.getElementById('outlierCount').textContent = count;
+        }
+        
+        // ===== ОБНОВЛЕНИЕ ИНТЕРФЕЙСА =====
+        function updateAll() {
+            updateTable();
+            updateCharts();
+            updateResults();
+        }
+        
+        function updateSliders() {
+            document.getElementById('k1Slider').value = currentK1;
+            document.getElementById('k2Slider').value = currentK2;
+            document.getElementById('bSlider').value = currentB;
+            
+            document.getElementById('k1Value').textContent = currentK1.toFixed(4);
+            document.getElementById('k2Value').textContent = currentK2.toFixed(4);
+            document.getElementById('bValue').textContent = currentB.toFixed(4);
+        }
+        
+        function updateFormula() {
+            document.getElementById('formulaBox').innerHTML = 
+                `pH = <b>${currentK1.toFixed(3)}</b>·log|I<sub>кат</sub>| + <b>${currentK2.toFixed(3)}</b>·log|I<sub>ан</sub>| + <b>${currentB.toFixed(3)}</b>`;
+        }
+        
+        function updateFromSlider(param) {
+            if (param === 'k1') currentK1 = parseFloat(document.getElementById('k1Slider').value);
+            else if (param === 'k2') currentK2 = parseFloat(document.getElementById('k2Slider').value);
+            else if (param === 'b') currentB = parseFloat(document.getElementById('bSlider').value);
+            
+            updateSliders();
+            updateFormula();
+            detectOutliers();
+            updateAll();
+        }
+        
+        // Fine adjust с удержанием
+        function startFineAdjust(param, delta) {
+            adjustParam(param, delta);
+            fineAdjustInterval = setInterval(() => adjustParam(param, delta), 100);
+        }
+        
+        function stopFineAdjust() {
+            if (fineAdjustInterval) {
+                clearInterval(fineAdjustInterval);
+                fineAdjustInterval = null;
+            }
+        }
+        
+        function adjustParam(param, delta) {
+            if (param === 'k1') currentK1 = Math.max(-10, Math.min(10, currentK1 + delta));
+            else if (param === 'k2') currentK2 = Math.max(-10, Math.min(10, currentK2 + delta));
+            else if (param === 'b') currentB = Math.max(-10, Math.min(10, currentB + delta));
+            
+            updateSliders();
+            updateFormula();
+            detectOutliers();
+            updateAll();
+        }
+        
+        function startEditParam(param) {
+            let currentVal;
+            if (param === 'k1') currentVal = currentK1;
+            else if (param === 'k2') currentVal = currentK2;
+            else currentVal = currentB;
+            
+            const newVal = prompt(`Введите значение ${param}:`, currentVal.toFixed(4));
+            if (newVal !== null) {
+                const val = parseFloat(newVal);
+                if (!isNaN(val)) {
+                    if (param === 'k1') currentK1 = Math.max(-10, Math.min(10, val));
+                    else if (param === 'k2') currentK2 = Math.max(-10, Math.min(10, val));
+                    else currentB = Math.max(-10, Math.min(10, val));
+                    
+                    updateSliders();
+                    updateFormula();
+                    detectOutliers();
+                    updateAll();
+                }
+            }
+        }
+        
+        function toggleLock(param) {
+            if (param === 'k1') lockedK1 = document.getElementById('lockK1').checked;
+            else if (param === 'k2') lockedK2 = document.getElementById('lockK2').checked;
+            else if (param === 'b') lockedB = document.getElementById('lockB').checked;
+        }
+        
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('modeAuto').classList.toggle('active', mode === 'auto');
+            document.getElementById('modeManual').classList.toggle('active', mode === 'manual');
+        }
+        
+        function setOptMode(mode) {
+            optimizationMode = mode;
+            document.getElementById('optConc').classList.toggle('active', mode === 'conc');
+            document.getElementById('optPh').classList.toggle('active', mode === 'ph');
+            
+            // Обновляем подписи
+            document.getElementById('rmseLabel').textContent = mode === 'ph' ? 'RMSE (pH):' : 'RMSE (C):';
+            document.getElementById('maxErrLabel').textContent = mode === 'ph' ? 'Макс (pH):' : 'Макс (C):';
+            
+            detectOutliers();
+            updateResults();
+        }
+        
+        function resetParams() {
+            currentK1 = 1.0;
+            currentK2 = 1.0;
+            currentB = 4.5;
+            updateSliders();
+            updateFormula();
+            detectOutliers();
+            updateAll();
+        }
+        
+        function recalculateFromSettings() {
+            const settings = getSettings();
+            
+            for (const point of rawData) {
+                if (point.cLabCalculated) {
+                    point.zone = getZone(point.phLab, settings);
+                    point.cLab = phToConcentration(point.phLab, settings);
+                }
+            }
+            
+            detectOutliers();
+            updateAll();
+        }
+        
+        // ===== ТАБЛИЦА =====
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            const settings = getSettings();
+            
+            if (rawData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" style="color:#999; padding:15px;">Загрузите данные</td></tr>';
+                document.getElementById('pointCount').textContent = '0';
+                document.getElementById('excludedCount').textContent = '0';
+                return;
+            }
+            
+            let html = '';
+            
+            for (let i = 0; i < rawData.length; i++) {
+                const point = rawData[i];
+                const isExcluded = excludedIndices.includes(i);
+                
+                // Расчёты
+                const phCalc = calculatePh(point.iCathode, point.iAnode);
+                const zoneCalc = getZone(phCalc, settings);
+                const cCalc = phToConcentration(phCalc, settings);
+                
+                const deltaPh = phCalc - point.phLab;
+                const cLabSigned = point.zone === 'acid' ? -point.cLab : point.cLab;
+                const cCalcSigned = zoneCalc === 'acid' ? -cCalc : cCalc;
+                const deltaC = cCalcSigned - cLabSigned;
+                
+                const colorLab = point.zone === 'acid' ? '#c62828' : '#2e7d32';
+                const colorCalc = zoneCalc === 'acid' ? '#c62828' : '#2e7d32';
+                
+                let rowClass = '';
+                if (isExcluded) rowClass = 'excluded';
+                else if (point.isOutlier) rowClass = 'outlier';
+                
+                html += `<tr class="${rowClass}">
+                    <td>${i + 1}<span style="cursor:pointer; color:#f44336; font-size:8px; margin-left:1px;" onclick="deleteRow(${i})">✕</span></td>
+                    <td class="editable-cell" onclick="editCell(${i}, 'iCathode')">${point.iCathode.toFixed(3)}</td>
+                    <td class="editable-cell" onclick="editCell(${i}, 'iAnode')">${point.iAnode.toFixed(3)}</td>
+                    <td class="editable-cell" style="color:${colorLab}; ${point.cLabCalculated ? 'font-style:italic;' : ''}" onclick="editCell(${i}, 'cLab')">${cLabSigned.toFixed(3)}</td>
+                    <td style="color:${colorCalc}; font-weight:bold;">${cCalcSigned.toFixed(3)}</td>
+                    <td style="color:${Math.abs(deltaC) > 1 ? '#ef6c00' : '#666'};">${deltaC >= 0 ? '+' : ''}${deltaC.toFixed(3)}</td>
+                    <td class="editable-cell" onclick="editCell(${i}, 'phLab')">${point.phLab.toFixed(2)}</td>
+                    <td style="color:#6a1b9a; font-weight:bold;">${phCalc.toFixed(2)}</td>
+                    <td style="color:${Math.abs(deltaPh) > 0.3 ? '#ef6c00' : '#666'};">${deltaPh >= 0 ? '+' : ''}${deltaPh.toFixed(3)}</td>
+                    <td><input type="checkbox" ${isExcluded ? '' : 'checked'} onchange="togglePoint(${i})"></td>
+                </tr>`;
+            }
+            
+            tbody.innerHTML = html;
+            document.getElementById('pointCount').textContent = rawData.length;
+            document.getElementById('excludedCount').textContent = excludedIndices.length;
+        }
+        
+        function togglePoint(idx) {
+            if (excludedIndices.includes(idx)) {
+                excludedIndices = excludedIndices.filter(i => i !== idx);
+            } else {
+                excludedIndices.push(idx);
+            }
+            detectOutliers();
+            updateAll();
+        }
+        
+        function deleteRow(idx) {
+            if (confirm('Удалить точку ' + (idx + 1) + '?')) {
+                rawData.splice(idx, 1);
+                excludedIndices = excludedIndices.filter(i => i !== idx).map(i => i > idx ? i - 1 : i);
+                detectOutliers();
+                updateAll();
+            }
+        }
+        
+        function editCell(idx, field) {
+            const point = rawData[idx];
+            let currentVal;
+            let label;
+            
+            if (field === 'iCathode') { currentVal = point.iCathode; label = 'I_катод'; }
+            else if (field === 'iAnode') { currentVal = point.iAnode; label = 'I_анод'; }
+            else if (field === 'cLab') { 
+                const sign = point.zone === 'acid' ? -1 : 1;
+                currentVal = sign * point.cLab; 
+                label = 'C_лаб (−кисл, +амм)'; 
+            }
+            else if (field === 'phLab') { currentVal = point.phLab; label = 'pH_лаб'; }
+            
+            const newVal = prompt(`${label}:`, currentVal.toFixed(4));
+            if (newVal !== null) {
+                const val = parseFloat(newVal);
+                if (!isNaN(val)) {
+                    const settings = getSettings();
+                    
+                    if (field === 'iCathode') {
+                        point.iCathode = val;
+                        point.logCathode = safeLog(val);
+                    } else if (field === 'iAnode') {
+                        point.iAnode = val;
+                        point.logAnode = safeLog(val);
+                    } else if (field === 'cLab') {
+                        point.zone = val < 0 ? 'acid' : 'ammonia';
+                        point.cLab = Math.abs(val);
+                        point.phLab = concentrationToPhByZone(point.cLab, point.zone, settings);
+                        point.cLabCalculated = false;
+                    } else if (field === 'phLab') {
+                        point.phLab = val;
+                        point.zone = getZone(val, settings);
+                        point.cLab = phToConcentration(val, settings);
+                        point.cLabCalculated = true;
+                    }
+                    
+                    detectOutliers();
+                    updateAll();
+                }
+            }
+        }
+        
+        function addDataRow() {
+            const iCathode = parseFloat(prompt('I_катод:', '-0.2')) || -0.2;
+            const iAnode = parseFloat(prompt('I_анод:', '0.5')) || 0.5;
+            const phLab = parseFloat(prompt('pH_лаб:', '5.0')) || 5.0;
+            
+            const settings = getSettings();
+            const zone = getZone(phLab, settings);
+            const cLab = phToConcentration(phLab, settings);
+            
+            rawData.push({
+                iCathode,
+                iAnode,
+                logCathode: safeLog(iCathode),
+                logAnode: safeLog(iAnode),
+                cLab,
+                phLab,
+                zone,
+                cLabCalculated: true,
+                isOutlier: false
+            });
+            
+            detectOutliers();
+            updateAll();
+        }
+        
+        // ===== ГРАФИКИ =====
+        function updateCharts() {
+            updateChartConcentration();
+            updateChartPh();
+        }
+        
+        function updateChartConcentration() {
+            if (rawData.length === 0) {
+                Plotly.newPlot('chartConcentration', [], { 
+                    margin: { t: 10, r: 10, b: 40, l: 40 },
+                    xaxis: { title: 'C_лаб' }, yaxis: { title: 'C_пр' }
+                }, { responsive: true });
+                return;
+            }
+            
+            const settings = getSettings();
+            const activeData = rawData.filter((_, i) => !excludedIndices.includes(i));
+            const excludedData = rawData.filter((_, i) => excludedIndices.includes(i));
+            
+            function getSignedC(point, isCalc = false) {
+                if (isCalc) {
+                    const phCalc = calculatePh(point.iCathode, point.iAnode);
+                    const zoneCalc = getZone(phCalc, settings);
+                    const cCalc = phToConcentration(phCalc, settings);
+                    return zoneCalc === 'acid' ? -cCalc : cCalc;
+                } else {
+                    return point.zone === 'acid' ? -point.cLab : point.cLab;
+                }
+            }
+            
+            const traces = [];
+            
+            // До калибровки (пустые)
+            if (activeData.length > 0) {
+                traces.push({
+                    x: activeData.map(p => getSignedC(p)),
+                    y: activeData.map(p => getSignedC(p)),
+                    mode: 'markers',
+                    name: 'До',
+                    marker: { 
+                        color: activeData.map(p => p.zone === 'acid' ? '#c62828' : '#2e7d32'),
+                        size: 8,
+                        line: { width: 2, color: activeData.map(p => p.zone === 'acid' ? '#c62828' : '#2e7d32') },
+                        symbol: 'circle-open'
+                    }
+                });
+                
+                // После калибровки (заполненные)
+                traces.push({
+                    x: activeData.map(p => getSignedC(p)),
+                    y: activeData.map(p => getSignedC(p, true)),
+                    mode: 'markers',
+                    name: 'После',
+                    marker: { 
+                        color: activeData.map(p => p.zone === 'acid' ? '#c62828' : '#2e7d32'),
+                        size: 8
+                    }
+                });
+            }
+            
+            // Исключённые
+            if (excludedData.length > 0) {
+                traces.push({
+                    x: excludedData.map(p => getSignedC(p)),
+                    y: excludedData.map(p => getSignedC(p, true)),
+                    mode: 'markers',
+                    name: 'Исключены',
+                    marker: { color: '#999', size: 6, symbol: 'x' }
+                });
+            }
+            
+            // Идеал
+            const allC = rawData.map(p => getSignedC(p));
+            const minC = Math.min(...allC) - 1;
+            const maxC = Math.max(...allC) + 1;
+            
+            traces.push({
+                x: [minC, maxC],
+                y: [minC, maxC],
+                mode: 'lines',
+                name: 'Идеал',
+                line: { color: '#999', dash: 'dash', width: 1 }
+            });
+            
+            Plotly.react('chartConcentration', traces, {
+                margin: { t: 10, r: 10, b: 40, l: 50 },
+                xaxis: { title: '← Кисл. | Амм. →', range: [minC, maxC] },
+                yaxis: { title: 'C_пр', range: [minC, maxC] },
+                showlegend: true,
+                legend: { x: 0, y: 1, font: { size: 8 } }
+            }, { responsive: true });
+        }
+        
+        function updateChartPh() {
+            if (rawData.length === 0) {
+                Plotly.newPlot('chartPh', [], { 
+                    margin: { t: 10, r: 10, b: 40, l: 40 },
+                    xaxis: { title: 'pH_лаб' }, yaxis: { title: 'pH_пр' }
+                }, { responsive: true });
+                return;
+            }
+            
+            const settings = getSettings();
+            const activeData = rawData.filter((_, i) => !excludedIndices.includes(i));
+            const excludedData = rawData.filter((_, i) => excludedIndices.includes(i));
+            
+            const traces = [];
+            
+            // До (пустые)
+            if (activeData.length > 0) {
+                traces.push({
+                    x: activeData.map(p => p.phLab),
+                    y: activeData.map(p => p.phLab),
+                    mode: 'markers',
+                    name: 'До',
+                    marker: { 
+                        color: activeData.map(p => p.zone === 'acid' ? '#c62828' : '#2e7d32'),
+                        size: 8,
+                        symbol: 'circle-open'
+                    }
+                });
+                
+                // После (заполненные)
+                traces.push({
+                    x: activeData.map(p => p.phLab),
+                    y: activeData.map(p => calculatePh(p.iCathode, p.iAnode)),
+                    mode: 'markers',
+                    name: 'После',
+                    marker: { 
+                        color: activeData.map(p => p.zone === 'acid' ? '#c62828' : '#2e7d32'),
+                        size: 8
+                    }
+                });
+            }
+            
+            // Исключённые
+            if (excludedData.length > 0) {
+                traces.push({
+                    x: excludedData.map(p => p.phLab),
+                    y: excludedData.map(p => calculatePh(p.iCathode, p.iAnode)),
+                    mode: 'markers',
+                    name: 'Исключены',
+                    marker: { color: '#999', size: 6, symbol: 'x' }
+                });
+            }
+            
+            // Мёртвая зона
+            const allPh = rawData.map(p => p.phLab);
+            const minPh = Math.min(...allPh) - 0.5;
+            const maxPh = Math.max(...allPh) + 0.5;
+            const phN = settings.phNeutral;
+            const dz = settings.deadZone / 2;
+            
+            traces.push({
+                x: [minPh, maxPh, maxPh, minPh, minPh],
+                y: [phN - dz, phN - dz, phN + dz, phN + dz, phN - dz],
+                fill: 'toself',
+                fillcolor: 'rgba(255,235,59,0.2)',
+                line: { color: 'rgba(255,235,59,0.5)' },
+                name: 'Мёртв.зона',
+                showlegend: false
+            });
+            
+            // Идеал
+            traces.push({
+                x: [minPh, maxPh],
+                y: [minPh, maxPh],
+                mode: 'lines',
+                name: 'Идеал',
+                line: { color: '#999', dash: 'dash', width: 1 }
+            });
+            
+            Plotly.react('chartPh', traces, {
+                margin: { t: 10, r: 10, b: 40, l: 50 },
+                xaxis: { title: 'pH_лаб', range: [minPh, maxPh] },
+                yaxis: { title: 'pH_пр', range: [minPh, maxPh] },
+                showlegend: true,
+                legend: { x: 0, y: 1, font: { size: 8 } }
+            }, { responsive: true });
+        }
+        
+        // ===== РЕЗУЛЬТАТЫ =====
+        function updateResults() {
+            const activeData = rawData.filter((_, i) => !excludedIndices.includes(i));
+            
+            if (activeData.length < 2) {
+                document.getElementById('resultR2').textContent = '—';
+                document.getElementById('resultRMSE').textContent = '—';
+                document.getElementById('resultMaxErr').textContent = '—';
+                return;
+            }
+            
+            const settings = getSettings();
+            let errors = [];
+            let actuals = [];
+            let predictions = [];
+            
+            for (const point of activeData) {
+                if (optimizationMode === 'ph') {
+                    const phCalc = calculatePh(point.iCathode, point.iAnode);
+                    errors.push(phCalc - point.phLab);
+                    actuals.push(point.phLab);
+                    predictions.push(phCalc);
+                } else {
+                    const phCalc = calculatePh(point.iCathode, point.iAnode);
+                    const zoneCalc = getZone(phCalc, settings);
+                    const cCalc = phToConcentration(phCalc, settings);
+                    const cCalcSigned = zoneCalc === 'acid' ? -cCalc : cCalc;
+                    const cLabSigned = point.zone === 'acid' ? -point.cLab : point.cLab;
+                    
+                    errors.push(cCalcSigned - cLabSigned);
+                    actuals.push(cLabSigned);
+                    predictions.push(cCalcSigned);
+                }
+            }
+            
+            const mse = errors.reduce((s, e) => s + e*e, 0) / errors.length;
+            const rmse = Math.sqrt(mse);
+            const maxErr = Math.max(...errors.map(Math.abs));
+            
+            const meanY = actuals.reduce((a, b) => a + b, 0) / actuals.length;
+            const ssTot = actuals.reduce((s, y) => s + (y - meanY)**2, 0);
+            const ssRes = errors.reduce((s, e) => s + e**2, 0);
+            const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+            
+            document.getElementById('resultR2').textContent = r2.toFixed(4);
+            document.getElementById('resultR2').style.color = r2 > 0.95 ? '#2e7d32' : r2 > 0.9 ? '#ef6c00' : '#c62828';
+            
+            document.getElementById('resultRMSE').textContent = rmse.toFixed(4);
+            document.getElementById('resultMaxErr').textContent = maxErr.toFixed(4);
+        }
+        
+        // ===== ПРИМЕР =====
+        function loadExample() {
+            const exampleData = `# Пример данных
+I_катод;I_анод;C_лаб;pH_лаб
+-0.131;0.59;;4.09
+-0.109;1.87;;4.65
+-0.095;3.70;;5.29
+-0.088;8.86;;5.79
+-0.083;18.97;;6.22
+-0.079;31.88;;6.61
+-0.229;-2.24;;3.34
+-0.378;-4.69;;2.89`;
+            
+            document.getElementById('loadedFileName').textContent = 'Пример ';
+            parseCSV(exampleData);
+        }
+        
+        // ===== ЭКСПОРТ =====
+        function exportCSV() {
+            if (rawData.length === 0) { alert('Нет данных'); return; }
+            
+            const settings = getSettings();
+            let csv = '# Калибровка pH (логарифмическая)\n';
+            csv += `# k1=${currentK1.toFixed(4)}; k2=${currentK2.toFixed(4)}; b=${currentB.toFixed(4)}\n`;
+            csv += 'I_катод;I_анод;C_лаб;C_пр;ΔC;pH_лаб;pH_пр;ΔpH\n';
+            
+            for (let i = 0; i < rawData.length; i++) {
+                if (excludedIndices.includes(i)) continue;
+                const p = rawData[i];
+                const phCalc = calculatePh(p.iCathode, p.iAnode);
+                const zoneCalc = getZone(phCalc, settings);
+                const cCalc = phToConcentration(phCalc, settings);
+                const cLabS = p.zone === 'acid' ? -p.cLab : p.cLab;
+                const cCalcS = zoneCalc === 'acid' ? -cCalc : cCalc;
+                
+                csv += `${p.iCathode};${p.iAnode};${cLabS.toFixed(3)};${cCalcS.toFixed(3)};${(cCalcS-cLabS).toFixed(3)};`;
+                csv += `${p.phLab.toFixed(2)};${phCalc.toFixed(2)};${(phCalc-p.phLab).toFixed(3)}\n`;
+            }
+            
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `calibration_log_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+        }
+        
+        function exportExcel() {
+            if (rawData.length === 0) { alert('Нет данных'); return; }
+            
+            const settings = getSettings();
+            const data = [['I_катод', 'I_анод', 'C_лаб', 'C_пр', 'ΔC', 'pH_лаб', 'pH_пр', 'ΔpH']];
+            
+            for (let i = 0; i < rawData.length; i++) {
+                if (excludedIndices.includes(i)) continue;
+                const p = rawData[i];
+                const phCalc = calculatePh(p.iCathode, p.iAnode);
+                const zoneCalc = getZone(phCalc, settings);
+                const cCalc = phToConcentration(phCalc, settings);
+                const cLabS = p.zone === 'acid' ? -p.cLab : p.cLab;
+                const cCalcS = zoneCalc === 'acid' ? -cCalc : cCalc;
+                
+                data.push([p.iCathode, p.iAnode, cLabS, cCalcS, cCalcS - cLabS, p.phLab, phCalc, phCalc - p.phLab]);
+            }
+            
+            const ws = XLSX.utils.aoa_to_sheet(data);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Калибровка');
+            XLSX.writeFile(wb, `calibration_log_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+        
+        // ===== ИСТОРИЯ =====
+        function saveCalibration() {
+            const history = JSON.parse(localStorage.getItem('phCalibrationLogHistory') || '[]');
+            
+            history.unshift({
+                date: new Date().toISOString(),
+                k1: currentK1,
+                k2: currentK2,
+                b: currentB,
+                r2: parseFloat(document.getElementById('resultR2').textContent) || 0,
+                settings: getSettings(),
+                dataCount: rawData.length - excludedIndices.length
+            });
+            
+            if (history.length > 50) history.pop();
+            localStorage.setItem('phCalibrationLogHistory', JSON.stringify(history));
+            alert('Калибровка сохранена!');
+        }
+        
+        function showHistory() {
+            const history = JSON.parse(localStorage.getItem('phCalibrationLogHistory') || '[]');
+            const list = document.getElementById('historyList');
+            
+            if (history.length === 0) {
+                list.innerHTML = '<p style="color:#999; text-align:center;">История пуста</p>';
+            } else {
+                list.innerHTML = history.map((entry, i) => {
+                    const date = new Date(entry.date).toLocaleString('ru-RU');
+                    return `<div style="padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <div style="font-weight:bold; font-size:12px;">${date}</div>
+                            <div style="font-size:11px; color:#666;">k₁=${entry.k1.toFixed(3)}, k₂=${entry.k2.toFixed(3)}, b=${entry.b.toFixed(3)}</div>
+                            <div style="font-size:10px; color:#999;">R²=${entry.r2.toFixed(4)}, точек: ${entry.dataCount}</div>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline" onclick="loadFromHistory(${i})">Загрузить</button>
+                            <button class="btn btn-sm" style="background:#f44336;color:white;" onclick="deleteFromHistory(${i})">✕</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+            
+            document.getElementById('historyModal').style.display = 'flex';
+        }
+        
+        function closeHistory() {
+            document.getElementById('historyModal').style.display = 'none';
+        }
+        
+        function loadFromHistory(index) {
+            const history = JSON.parse(localStorage.getItem('phCalibrationLogHistory') || '[]');
+            if (history[index]) {
+                const entry = history[index];
+                currentK1 = entry.k1;
+                currentK2 = entry.k2;
+                currentB = entry.b;
+                
+                if (entry.settings) {
+                    document.getElementById('phNeutral').value = entry.settings.phNeutral;
+                    document.getElementById('kAcid').value = entry.settings.kAcid;
+                    document.getElementById('kAmmonia').value = entry.settings.kAmmonia;
+                    document.getElementById('deadZone').value = entry.settings.deadZone;
+                }
+                
+                updateSliders();
+                updateFormula();
+                detectOutliers();
+                updateAll();
+                closeHistory();
+            }
+        }
+        
+        function deleteFromHistory(index) {
+            if (confirm('Удалить запись?')) {
+                const history = JSON.parse(localStorage.getItem('phCalibrationLogHistory') || '[]');
+                history.splice(index, 1);
+                localStorage.setItem('phCalibrationLogHistory', JSON.stringify(history));
+                showHistory();
+            }
+        }
+        
+        function clearHistory() {
+            if (confirm('Очистить всю историю?')) {
+                localStorage.removeItem('phCalibrationLogHistory');
+                showHistory();
+            }
+        }
+        
+        function exportHistory() {
+            const history = JSON.parse(localStorage.getItem('phCalibrationLogHistory') || '[]');
+            const blob = new Blob([JSON.stringify(history, null, 2)], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `ph_log_history_${new Date().toISOString().slice(0,10)}.json`;
+            link.click();
+        }
+        
+        function importHistory(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        localStorage.setItem('phCalibrationLogHistory', JSON.stringify(imported));
+                        showHistory();
+                        alert('История импортирована!');
+                    }
+                } catch (err) {
+                    alert('Ошибка чтения файла');
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        // ===== DRAG & DROP =====
+        const dropzone = document.getElementById('dropzone');
+        
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = '#6a1b9a';
+            dropzone.style.background = '#f3e5f5';
+        });
+        
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.style.borderColor = '#ddd';
+            dropzone.style.background = '';
+        });
+        
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.style.borderColor = '#ddd';
+            dropzone.style.background = '';
+            
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+        
+        // Инициализация
+        updateSliders();
+        updateFormula();
+        updateCharts();
+    </script>
+</body>
+</html>
